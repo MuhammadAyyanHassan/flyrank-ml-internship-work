@@ -1,0 +1,569 @@
+{
+  "release_id": "flyrank_pseudonymized_warehouse_release_v20260703",
+  "lane": "Refresh / Content Opportunity Scoring",
+  "label_rule": "outcome-window impressions < 0.80 * decision-window impressions, decision-window impressions > 0",
+  "random_state": 42,
+  "bootstrap_reps": 2000,
+  "headline_k": 100,
+  "features": [
+    "w_impressions",
+    "w_clicks",
+    "w_ctr_pct",
+    "w_avg_position",
+    "w_impression_days",
+    "w_late_share",
+    "w_max_day_share",
+    "w_impr_cv",
+    "w_active_day_share"
+  ],
+  "frames": [
+    {
+      "frame": "A primary",
+      "features_from": "2026-03",
+      "outcome_from": "2026-04",
+      "rows": 158549,
+      "clients": 46,
+      "decline_rate": 0.4782
+    },
+    {
+      "frame": "B forward test",
+      "features_from": "2026-04",
+      "outcome_from": "2026-05",
+      "rows": 183345,
+      "clients": 51,
+      "decline_rate": 0.4721
+    }
+  ],
+  "primary": {
+    "decision_window": "2026-03",
+    "outcome_window": "2026-04",
+    "base_rate": 0.4782,
+    "fold_ctr_cutoffs_pct": [
+      0.1911,
+      0.2155,
+      0.1907,
+      0.1886,
+      0.1734
+    ],
+    "precision_at_k": [
+      {
+        "scorer": "Rule baseline",
+        "k": 10,
+        "precision_pct": 50.0,
+        "ci95_low_pct": 20.0,
+        "ci95_high_pct": 80.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 2.18
+      },
+      {
+        "scorer": "Rule baseline",
+        "k": 50,
+        "precision_pct": 46.0,
+        "ci95_low_pct": 32.0,
+        "ci95_high_pct": 60.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": -1.82
+      },
+      {
+        "scorer": "Rule baseline",
+        "k": 100,
+        "precision_pct": 43.0,
+        "ci95_low_pct": 33.0,
+        "ci95_high_pct": 53.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": -4.82
+      },
+      {
+        "scorer": "Rule baseline",
+        "k": 500,
+        "precision_pct": 49.6,
+        "ci95_low_pct": 45.2,
+        "ci95_high_pct": 54.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 1.78
+      },
+      {
+        "scorer": "Logistic regression",
+        "k": 10,
+        "precision_pct": 100.0,
+        "ci95_low_pct": 100.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 52.18
+      },
+      {
+        "scorer": "Logistic regression",
+        "k": 50,
+        "precision_pct": 96.0,
+        "ci95_low_pct": 90.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 48.18
+      },
+      {
+        "scorer": "Logistic regression",
+        "k": 100,
+        "precision_pct": 93.0,
+        "ci95_low_pct": 87.0,
+        "ci95_high_pct": 98.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 45.18
+      },
+      {
+        "scorer": "Logistic regression",
+        "k": 500,
+        "precision_pct": 86.8,
+        "ci95_low_pct": 83.8,
+        "ci95_high_pct": 89.6,
+        "base_rate_pct": 47.82,
+        "lift_pp": 38.98
+      },
+      {
+        "scorer": "Histogram GB",
+        "k": 10,
+        "precision_pct": 90.0,
+        "ci95_low_pct": 70.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 42.18
+      },
+      {
+        "scorer": "Histogram GB",
+        "k": 50,
+        "precision_pct": 90.0,
+        "ci95_low_pct": 80.0,
+        "ci95_high_pct": 98.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 42.18
+      },
+      {
+        "scorer": "Histogram GB",
+        "k": 100,
+        "precision_pct": 88.0,
+        "ci95_low_pct": 81.0,
+        "ci95_high_pct": 94.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 40.18
+      },
+      {
+        "scorer": "Histogram GB",
+        "k": 500,
+        "precision_pct": 93.4,
+        "ci95_low_pct": 91.2,
+        "ci95_high_pct": 95.6,
+        "base_rate_pct": 47.82,
+        "lift_pp": 45.58
+      }
+    ],
+    "ranking_metrics": [
+      {
+        "scorer": "Rule baseline",
+        "roc_auc": 0.5249,
+        "average_precision": 0.4994
+      },
+      {
+        "scorer": "Logistic regression",
+        "roc_auc": 0.6644,
+        "average_precision": 0.6378
+      },
+      {
+        "scorer": "Histogram GB",
+        "roc_auc": 0.7155,
+        "average_precision": 0.6874
+      }
+    ],
+    "permutation_importance": [
+      {
+        "feature": "w_late_share",
+        "importance_mean": 0.11601,
+        "importance_sd": 0.00413
+      },
+      {
+        "feature": "w_impr_cv",
+        "importance_mean": 0.04854,
+        "importance_sd": 0.00486
+      },
+      {
+        "feature": "w_max_day_share",
+        "importance_mean": 0.03426,
+        "importance_sd": 0.00157
+      },
+      {
+        "feature": "w_clicks",
+        "importance_mean": 0.00601,
+        "importance_sd": 0.00033
+      },
+      {
+        "feature": "w_impressions",
+        "importance_mean": 5e-05,
+        "importance_sd": 0.0003
+      },
+      {
+        "feature": "w_ctr_pct",
+        "importance_mean": 0.0,
+        "importance_sd": 5e-05
+      },
+      {
+        "feature": "w_impression_days",
+        "importance_mean": -0.00029,
+        "importance_sd": 5e-05
+      },
+      {
+        "feature": "w_active_day_share",
+        "importance_mean": -0.00029,
+        "importance_sd": 5e-05
+      },
+      {
+        "feature": "w_avg_position",
+        "importance_mean": -0.00863,
+        "importance_sd": 0.00134
+      }
+    ],
+    "logreg_clears_rule_beyond_band": true,
+    "histgb_clears_logreg_beyond_band": false,
+    "best_point_estimate_scorer": "Logistic regression"
+  },
+  "feature_ablation": {
+    "level_features": [
+      "w_impressions",
+      "w_clicks",
+      "w_ctr_pct",
+      "w_avg_position",
+      "w_impression_days"
+    ],
+    "dynamics_features": [
+      "w_late_share",
+      "w_max_day_share",
+      "w_impr_cv",
+      "w_active_day_share"
+    ],
+    "precision_at_k": [
+      {
+        "scorer": "Logistic - level only",
+        "k": 10,
+        "precision_pct": 60.0,
+        "ci95_low_pct": 30.0,
+        "ci95_high_pct": 90.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 12.18
+      },
+      {
+        "scorer": "Logistic - level only",
+        "k": 50,
+        "precision_pct": 64.0,
+        "ci95_low_pct": 50.0,
+        "ci95_high_pct": 78.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 16.18
+      },
+      {
+        "scorer": "Logistic - level only",
+        "k": 100,
+        "precision_pct": 60.0,
+        "ci95_low_pct": 50.0,
+        "ci95_high_pct": 70.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 12.18
+      },
+      {
+        "scorer": "Logistic - level only",
+        "k": 500,
+        "precision_pct": 56.6,
+        "ci95_low_pct": 52.2,
+        "ci95_high_pct": 61.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 8.78
+      },
+      {
+        "scorer": "Logistic - level + dynamics",
+        "k": 10,
+        "precision_pct": 100.0,
+        "ci95_low_pct": 100.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 52.18
+      },
+      {
+        "scorer": "Logistic - level + dynamics",
+        "k": 50,
+        "precision_pct": 96.0,
+        "ci95_low_pct": 90.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 48.18
+      },
+      {
+        "scorer": "Logistic - level + dynamics",
+        "k": 100,
+        "precision_pct": 93.0,
+        "ci95_low_pct": 88.0,
+        "ci95_high_pct": 97.0,
+        "base_rate_pct": 47.82,
+        "lift_pp": 45.18
+      },
+      {
+        "scorer": "Logistic - level + dynamics",
+        "k": 500,
+        "precision_pct": 86.8,
+        "ci95_low_pct": 83.8,
+        "ci95_high_pct": 89.8,
+        "base_rate_pct": 47.82,
+        "lift_pp": 38.98
+      }
+    ],
+    "ranking_metrics": [
+      {
+        "scorer": "Logistic - level only",
+        "roc_auc": 0.59,
+        "average_precision": 0.5382
+      },
+      {
+        "scorer": "Logistic - level + dynamics",
+        "roc_auc": 0.6644,
+        "average_precision": 0.6378
+      }
+    ],
+    "headline_k_gap_pp": 33.0
+  },
+  "forward": {
+    "decision_window": "2026-04",
+    "outcome_window": "2026-05",
+    "base_rate": 0.4721,
+    "clients_shared_with_primary": 46,
+    "rule_cutoff_from_primary_pct": 0.1908,
+    "precision_at_k": [
+      {
+        "scorer": "Rule baseline",
+        "k": 10,
+        "precision_pct": 40.0,
+        "ci95_low_pct": 10.0,
+        "ci95_high_pct": 70.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": -7.21
+      },
+      {
+        "scorer": "Rule baseline",
+        "k": 50,
+        "precision_pct": 26.0,
+        "ci95_low_pct": 14.0,
+        "ci95_high_pct": 38.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": -21.21
+      },
+      {
+        "scorer": "Rule baseline",
+        "k": 100,
+        "precision_pct": 32.0,
+        "ci95_low_pct": 23.0,
+        "ci95_high_pct": 41.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": -15.21
+      },
+      {
+        "scorer": "Rule baseline",
+        "k": 500,
+        "precision_pct": 38.8,
+        "ci95_low_pct": 34.6,
+        "ci95_high_pct": 43.2,
+        "base_rate_pct": 47.21,
+        "lift_pp": -8.41
+      },
+      {
+        "scorer": "Logistic regression",
+        "k": 10,
+        "precision_pct": 90.0,
+        "ci95_low_pct": 70.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": 42.79
+      },
+      {
+        "scorer": "Logistic regression",
+        "k": 50,
+        "precision_pct": 96.0,
+        "ci95_low_pct": 90.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": 48.79
+      },
+      {
+        "scorer": "Logistic regression",
+        "k": 100,
+        "precision_pct": 98.0,
+        "ci95_low_pct": 95.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": 50.79
+      },
+      {
+        "scorer": "Logistic regression",
+        "k": 500,
+        "precision_pct": 96.4,
+        "ci95_low_pct": 94.8,
+        "ci95_high_pct": 98.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": 49.19
+      },
+      {
+        "scorer": "Histogram GB",
+        "k": 10,
+        "precision_pct": 100.0,
+        "ci95_low_pct": 100.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": 52.79
+      },
+      {
+        "scorer": "Histogram GB",
+        "k": 50,
+        "precision_pct": 98.0,
+        "ci95_low_pct": 94.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": 50.79
+      },
+      {
+        "scorer": "Histogram GB",
+        "k": 100,
+        "precision_pct": 99.0,
+        "ci95_low_pct": 97.0,
+        "ci95_high_pct": 100.0,
+        "base_rate_pct": 47.21,
+        "lift_pp": 51.79
+      },
+      {
+        "scorer": "Histogram GB",
+        "k": 500,
+        "precision_pct": 98.0,
+        "ci95_low_pct": 96.8,
+        "ci95_high_pct": 99.2,
+        "base_rate_pct": 47.21,
+        "lift_pp": 50.79
+      }
+    ],
+    "ranking_metrics": [
+      {
+        "scorer": "Rule baseline",
+        "roc_auc": 0.5582,
+        "average_precision": 0.509
+      },
+      {
+        "scorer": "Logistic regression",
+        "roc_auc": 0.7579,
+        "average_precision": 0.7342
+      },
+      {
+        "scorer": "Histogram GB",
+        "roc_auc": 0.7746,
+        "average_precision": 0.7633
+      }
+    ],
+    "model_held_above_base_rate_and_rule": true
+  },
+  "playbook": {
+    "rank_score": "score_logreg",
+    "min_actionable_impressions": 100,
+    "reference_ctr_cutoff_pct": 0.1908,
+    "topk_reason_mix": [
+      {
+        "reason_code": "front_loaded_window",
+        "pages": 8,
+        "observed_decline_pct": 100.0,
+        "median_impressions": 1170.5
+      },
+      {
+        "reason_code": "model_flag_no_single_pattern",
+        "pages": 3,
+        "observed_decline_pct": 66.67,
+        "median_impressions": 143907.0
+      },
+      {
+        "reason_code": "single_day_spike",
+        "pages": 49,
+        "observed_decline_pct": 95.92,
+        "median_impressions": 752.0
+      },
+      {
+        "reason_code": "thin_daily_coverage",
+        "pages": 6,
+        "observed_decline_pct": 100.0,
+        "median_impressions": 206.5
+      },
+      {
+        "reason_code": "visible_but_low_ctr",
+        "pages": 34,
+        "observed_decline_pct": 88.24,
+        "median_impressions": 3725.5
+      }
+    ],
+    "topk_action_mix": [
+      {
+        "action": "Stability review before any edit",
+        "pages": 49
+      },
+      {
+        "action": "Title and snippet review",
+        "pages": 34
+      },
+      {
+        "action": "Freshness review",
+        "pages": 8
+      },
+      {
+        "action": "Coverage and indexing review",
+        "pages": 5
+      },
+      {
+        "action": "General review, reviewer judgment",
+        "pages": 3
+      },
+      {
+        "action": "Hold: too little measured visibility to act on",
+        "pages": 1
+      }
+    ],
+    "no_go_rows_in_topk": 1
+  },
+  "leakage_audit": [
+    {
+      "check": "No outcome-window or label-derived column in features",
+      "status": "PASS"
+    },
+    {
+      "check": "No hash identifier used as a model feature",
+      "status": "PASS"
+    },
+    {
+      "check": "Every feature carries the decision-window w_ prefix",
+      "status": "PASS"
+    },
+    {
+      "check": "Outcome window is strictly later than the decision window",
+      "status": "PASS"
+    },
+    {
+      "check": "One row per client and content key in both frames",
+      "status": "PASS"
+    },
+    {
+      "check": "Zero client overlap inside every grouped fold",
+      "status": "PASS"
+    },
+    {
+      "check": "Rule cutoff fitted on training rows only, never on evaluation rows",
+      "status": "PASS"
+    },
+    {
+      "check": "Forward test uses parameters fitted on Frame A only",
+      "status": "PASS"
+    },
+    {
+      "check": "Frames sorted on join keys before any split, so the run is deterministic",
+      "status": "PASS"
+    },
+    {
+      "check": "Queue export carries no client name, URL or query field",
+      "status": "PASS"
+    }
+  ]
+}
