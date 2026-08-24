@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which pages are about to lose Google Search visibility? A decision-time triage model</title>
+<meta name="description" content="A decision-time model that ranks a content library so pages most likely to lose search visibility next month rise to the top of a short review queue. Built on the FlyRank ML Internship dataset.">
+<style>
+  :root{
+    --ink:#1b1b1b; --muted:#5f6368; --line:#e4e4e4; --bg:#ffffff;
+    --accent:#0f766e;            /* logistic / hero */
+    --amber:#b45309;             /* histogram GB */
+    --rule:#9aa0a6;              /* rule baseline */
+    --baserate:#d93025;          /* base-rate threshold */
+    --callout:#fdf3e6; --callout-line:#e6b980;
+    --tint:#eef7f5;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:Georgia,"Times New Roman",serif;
+    font-size:18px; line-height:1.65;
+  }
+  .wrap{max-width:780px; margin:0 auto; padding:40px 22px 90px}
+  header.page{border-bottom:2px solid var(--ink); padding-bottom:22px; margin-bottom:8px}
+  h1{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+     font-size:32px; line-height:1.18; letter-spacing:-.01em; margin:0 0 12px}
+  .subtitle{font-size:19px; color:#333; margin:0 0 16px; line-height:1.5}
+  .meta{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        font-size:13.5px; color:var(--muted); line-height:1.55}
+  .safenote{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        font-size:12.5px; color:var(--muted); margin-top:10px}
+  h2{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+     font-size:23px; margin:44px 0 6px; padding-top:8px; letter-spacing:-.01em}
+  h2 .num{color:var(--accent); font-weight:700; margin-right:.4em}
+  h3{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+     font-size:17px; margin:26px 0 4px}
+  p{margin:12px 0}
+  a{color:var(--accent)}
+  strong{color:#111}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+     font-size:.86em; background:#f3f4f4; padding:1px 5px; border-radius:4px}
+  ul,ol{margin:12px 0; padding-left:24px}
+  li{margin:6px 0}
+  .lead-scenario{background:var(--tint); border-left:4px solid var(--accent);
+     padding:14px 18px; margin:18px 0; border-radius:0 6px 6px 0}
+  .callout{background:var(--callout); border:1px solid var(--callout-line);
+     border-radius:8px; padding:16px 18px; margin:22px 0}
+  .callout h3{margin-top:0; color:#8a5200}
+  figure{margin:26px 0; padding:0}
+  figure svg{width:100%; height:auto; display:block}
+  figcaption{font-size:14px; color:var(--muted); font-style:italic;
+     margin-top:10px; line-height:1.5;
+     font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .tablewrap{overflow-x:auto; margin:18px 0}
+  table{border-collapse:collapse; width:100%; font-size:14px;
+     font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  caption{caption-side:top; text-align:left; font-size:13.5px; color:var(--muted);
+     font-style:italic; margin-bottom:8px}
+  th,td{border-bottom:1px solid var(--line); padding:8px 10px; text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  thead th{border-bottom:2px solid #ccc; color:#333}
+  tbody tr:hover{background:#fafafa}
+  .num-hi{color:var(--accent); font-weight:700}
+  .legend{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+     font-size:13px; display:flex; flex-wrap:wrap; gap:14px; margin:4px 0 2px}
+  .legend span{display:inline-flex; align-items:center; gap:6px}
+  .sw{width:13px; height:13px; border-radius:3px; display:inline-block}
+  footer{margin-top:60px; padding-top:22px; border-top:1px solid var(--line);
+     font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+     font-size:14px; color:var(--muted)}
+  footer a{color:var(--accent)}
+  @media (max-width:560px){
+    body{font-size:16.5px}
+    h1{font-size:26px}
+    .wrap{padding:28px 16px 70px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Which pages are about to lose search visibility?</h1>
+  <p class="subtitle">Ranking a content library at decision time so the pages most likely to decline next month rise to the top of a short review queue &mdash; tested against a transparent rule and a held-out future month.</p>
+  <p class="meta">Muhammad Ayyan Hassan &middot; FlyRank ML Internship (Machine Learning track) &middot; Lane: Refresh / Content Opportunity Scoring &middot; August 2026</p>
+  <p class="safenote">Built on a pseudonymized research dataset. No client names, domains, URLs, or search queries appear anywhere in this paper.</p>
+</header>
+
+<section id="abstract">
+  <h2><span class="num">1</span>Abstract</h2>
+  <p>Can a content team, using only search behavior observable at decision time, rank a page library so the pages most likely to lose search visibility next month rise to the top of a short review queue? Working from a pseudonymized FlyRank search-warehouse release of 158,549 page-months across 46 clients, we defined a next-month decline proxy and engineered nine decision-window features covering both traffic level and within-window dynamics. A transparent rule baseline, logistic regression, and gradient boosting were compared under client-grouped cross-validation, scored by Precision@K against the base rate on the identical split, and re-tested on a later, unseen month. At the operational depth of the top 100 pages the logistic model reached 93.0% precision against a 47.8% base rate &mdash; while the rule baseline did no better than chance &mdash; but an ablation shows most of that lift comes from within-window momentum features, so the system is better described as triaging pages already sliding than as forecasting a decline before it begins. The deliverable is therefore a ranked, reason-coded review queue for prioritizing human attention &mdash; a decision-support tool, not a claim about Google&rsquo;s algorithm or the cause of any page&rsquo;s decline.</p>
+</section>
+
+<section id="intro">
+  <h2><span class="num">2</span>Introduction &amp; problem statement</h2>
+  <p>A team responsible for a large body of published content &mdash; here, an agency managing many client sites &mdash; has far more pages than it can ever hand-review. Each month only a small slice can be looked at closely. The practical question is not &ldquo;what is wrong with the whole library,&rdquo; but a triage question: <strong>which pages should a human open first?</strong></p>
+  <div class="lead-scenario">
+    <p style="margin:0">Review a page that was going to stay healthy and you have spent scarce attention for nothing. Miss a page that is about to lose search visibility and traffic erodes before anyone notices. A good review queue is the difference between catching a slide early and finding out from a quarterly report.</p>
+  </div>
+  <p>This work supports that one decision. The unit of analysis is a single page (for a single client) in a single month; the output is a rank, a reason code, a suggested review action, and a confidence band; the action a person takes is to review the top of the queue downward until their time runs out.</p>
+  <p>Why involve a model at all? The risk signal is spread thinly across the daily behavior of 158,549 page-months &mdash; no one eyeballs that at scale, and eyeballing invites inconsistent, gut-feel prioritization. A model can rank the whole library consistently and cheaply, and &mdash; crucially &mdash; can be checked against a transparent rule so we know whether it actually earns its complexity. To be clear from the outset about what this is: it prioritizes pages <em>already</em> at risk for human review. It is triage, not a forecast of decline before any sign of it appears, and the results section is built to show exactly where that line falls.</p>
+</section>
+
+<section id="data">
+  <h2><span class="num">3</span>Data</h2>
+  <p>The source is the pseudonymized FlyRank ML Internship warehouse release <span class="mono">flyrank_pseudonymized_warehouse_release_v20260703</span>, specifically the <span class="mono">fact_content_daily_performance</span> table. It was queried in place with DuckDB over the gated Hugging Face release (<span class="mono">hf://</span>); the dataset itself is never downloaded into the repository or committed. Only the two calendar months needed for each analysis frame were pulled &mdash; not the full 78.8M-row fact table &mdash; and the release&rsquo;s held-out <span class="mono">_sample</span> table (which holds the last month of the release) was never touched.</p>
+
+  <h3>Two time frames</h3>
+  <p>Every page is summarized over a one-month <em>decision window</em> and then checked against the <em>following</em> month, the <em>outcome window</em>:</p>
+  <ul>
+    <li><strong>Frame A (development)</strong> &mdash; March 2026 features &rarr; April 2026 outcome. 158,549 rows, 46 clients, decline rate 47.82%. All model development and cross-validation happen here.</li>
+    <li><strong>Frame B (forward-time test)</strong> &mdash; April 2026 features &rarr; May 2026 outcome. 183,345 rows, 51 clients, decline rate 47.21%. Used once, at the end, to check stability on a month the model never saw. 46 clients appear in both frames.</li>
+  </ul>
+
+  <h3>What was excluded, and why</h3>
+  <p>Rows without confirmed Search Console availability (<span class="mono">gsc_data_available</span> not true) were dropped. A page also had to appear in <em>both</em> the decision and outcome windows, so that its outcome is defined at all. That second filter is a survivorship rule &mdash; pages that vanished entirely between the two months are not counted &mdash; and it is named again in the limitations, because it shapes what &ldquo;decline&rdquo; can mean here.</p>
+  <p>On safety: the source carries only pseudonymous hash identifiers, and none are printed in this paper. No client names, domains, URLs, or search queries appear here or in the repository. One data-quality caveat about the average-position column is documented in the limitations section rather than buried here.</p>
+</section>
+
+<section id="method">
+  <h2><span class="num">4</span>Methodology</h2>
+
+  <h3>The label (a proxy)</h3>
+  <p>A page is labeled a next-month decline (<span class="mono">future_decline_label = 1</span>) when it had impressions in the decision window <em>and</em> its outcome-window impressions fell below 80% of the decision-window level. It is a proxy for &ldquo;lost meaningful visibility,&rdquo; not a ground-truth verdict, and the 80% cutoff is a modeling choice.</p>
+
+  <h3>Features &mdash; nine, all from the decision window</h3>
+  <p>Every feature is measured strictly inside the decision window and carries a <span class="mono">w_</span> prefix to mark it as decision-time-only. They split into two families:</p>
+  <ul>
+    <li><strong>Level (5):</strong> <span class="mono">w_impressions</span>, <span class="mono">w_clicks</span>, <span class="mono">w_ctr_pct</span>, <span class="mono">w_avg_position</span> (impression-weighted), <span class="mono">w_impression_days</span> &mdash; how much traffic the page had and how visible it was.</li>
+    <li><strong>Dynamics (4):</strong> <span class="mono">w_late_share</span>, <span class="mono">w_max_day_share</span>, <span class="mono">w_impr_cv</span>, <span class="mono">w_active_day_share</span> &mdash; how that traffic was distributed across the days of the window: late-weighting, single-day spikes, day-to-day variability, and how many days were active at all.</li>
+  </ul>
+  <p>Deliberately excluded to prevent leakage: any outcome-window field or the label itself; the product&rsquo;s own <span class="mono">trend_direction</span> and <span class="mono">trend_pct</span> (both label-derived); the product flags <span class="mono">health_score</span>, <span class="mono">priority_score</span>, and <span class="mono">action_type</span>; and both hash identifiers, which are used only to group folds and never as features. As a guardrail, the notebook asserts that every feature in the final feature list carries the <span class="mono">w_</span> decision-window prefix.</p>
+
+  <h3>Baseline &mdash; a transparent rule</h3>
+  <p>The model is measured against a frozen rule from the earlier baseline week, chosen because it is exactly the kind of common-sense heuristic a team would otherwise use by hand: score 5 if a page had at least 500 impressions <em>and</em> an average position of 4&ndash;20 <em>and</em> a CTR below the median CTR of that visible band; score 3 for volume alone; 0 otherwise. The band-median CTR is refit inside each training fold only, never on the rows being scored. The per-fold CTR cutoffs were 0.1911%, 0.2155%, 0.1907%, 0.1886%, and 0.1734%.</p>
+
+  <h3>Models</h3>
+  <p>Two models sit on the same features and the same split: <strong>logistic regression</strong> (median-impute &rarr; standardize &rarr; <span class="mono">max_iter=1000</span>) as the primary model, and a <strong>HistGradientBoostingClassifier</strong> as a complexity test &mdash; there to answer &ldquo;does a more flexible model actually do better here?&rdquo;</p>
+
+  <h3>Validation</h3>
+  <p>Scoring uses <span class="mono">StratifiedGroupKFold</span> (5 folds, shuffled, <span class="mono">random_state=42</span>) grouped on client, with out-of-fold predictions and a per-fold assertion that no client appears in both train and test. Every score is therefore earned on clients the model did not train on. Both frames are sorted on their join keys before any split, which makes the run deterministic &mdash; an earlier non-determinism from DuckDB&rsquo;s <span class="mono">GROUP BY</span> row order is what made two prior weeks&rsquo; AUC numbers disagree, and sorting fixed it.</p>
+
+  <h3>Uncertainty &amp; the primary metric</h3>
+  <p>Bands come from a 2000-replicate bootstrap (seed 42). They should be read carefully: each band describes how the outcome varies <em>within the selected top-K, with the ranking held fixed</em> &mdash; it is not a confidence interval over redrawing the whole population. The primary metric is <strong>Precision@K</strong> at K = 10, 50, 100, and 500, always reported next to the base rate; the headline operating depth is <strong>K = 100</strong>, the size of a realistic monthly review queue.</p>
+
+  <div class="callout" style="background:var(--tint); border-color:#bfe0da">
+    <h3 style="color:#0b5d54">Leakage audit &mdash; all ten checks passed</h3>
+    <ol style="margin-bottom:0">
+      <li>No outcome-window or label-derived column appears among the features.</li>
+      <li>No hash identifier is used as a model feature.</li>
+      <li>Every feature carries the decision-window <span class="mono">w_</span> prefix.</li>
+      <li>The outcome window is strictly later than the decision window.</li>
+      <li>Exactly one row per client and content key in each frame.</li>
+      <li>Zero client overlap inside every grouped fold.</li>
+      <li>The rule&rsquo;s CTR cutoff is fitted on training rows only, never on evaluation rows.</li>
+      <li>The forward test uses parameters fitted on Frame A only.</li>
+      <li>Frames are sorted on join keys before any split, so the run is deterministic.</li>
+      <li>The exported queue carries no client name, URL, or query field.</li>
+    </ol>
+  </div>
+</section>
+
+<section id="results">
+  <h2><span class="num">5</span>Results</h2>
+  <p>All three scorers run on the same client-grouped, out-of-fold split, so every comparison below is apples-to-apples. Precision@K answers the operational question directly: of the top K pages the scorer flags, what fraction actually declined? The number to keep in view is the <strong>47.82% base rate</strong> &mdash; the share of all pages that declined &mdash; because any scorer worth using has to beat picking pages at random.</p>
+
+  <h3>Precision@K on the development frame (March &rarr; April 2026)</h3>
+  <div class="tablewrap">
+  <table>
+    <caption>Precision@K (%), Frame A. Bootstrap 95% band in brackets. Base rate = 47.82%.</caption>
+    <thead>
+      <tr><th>Scorer</th><th>Top 10</th><th>Top 50</th><th>Top 100</th><th>Top 500</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Rule baseline</td><td>50.0 <small>[20.0, 80.0]</small></td><td>46.0 <small>[32.0, 60.0]</small></td><td>43.0 <small>[33.0, 53.0]</small></td><td>49.6 <small>[45.2, 54.0]</small></td></tr>
+      <tr><td>Logistic regression</td><td>100.0 <small>[100, 100]</small></td><td>96.0 <small>[90.0, 100]</small></td><td class="num-hi">93.0 <small>[87.0, 98.0]</small></td><td>86.8 <small>[83.8, 89.6]</small></td></tr>
+      <tr><td>Gradient boosting</td><td>90.0 <small>[70.0, 100]</small></td><td>90.0 <small>[80.0, 98.0]</small></td><td>88.0 <small>[81.0, 94.0]</small></td><td>93.4 <small>[91.2, 95.6]</small></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="legend" aria-hidden="true">
+    <span><span class="sw" style="background:var(--rule)"></span>Rule baseline</span>
+    <span><span class="sw" style="background:var(--accent)"></span>Logistic regression</span>
+    <span><span class="sw" style="background:var(--amber)"></span>Gradient boosting</span>
+    <span><span style="display:inline-block;width:16px;border-top:2px dashed var(--baserate);vertical-align:middle"></span>&nbsp;Base rate 47.8%</span>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 760 430" role="img" aria-labelledby="c1t c1d" preserveAspectRatio="xMinYMin meet">
+    <title id="c1t">Precision at K on the development frame</title>
+    <desc id="c1d">Grouped horizontal bars comparing rule baseline, logistic regression and gradient boosting precision at the top 10, 50, 100 and 500 pages, against a 47.8 percent base rate. Logistic regression is far above the base rate at every depth; the rule baseline sits near it.</desc>
+    <!-- gridlines -->
+    <g stroke="#eeeeee" stroke-width="1">
+      <line x1="325" y1="18" x2="325" y2="388"/><line x1="450" y1="18" x2="450" y2="388"/>
+      <line x1="575" y1="18" x2="575" y2="388"/><line x1="700" y1="18" x2="700" y2="388"/>
+    </g>
+    <line x1="200" y1="18" x2="200" y2="388" stroke="#cccccc" stroke-width="1"/>
+    <!-- axis tick labels -->
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="11" fill="#999" text-anchor="middle">
+      <text x="200" y="404">0</text><text x="325" y="404">25</text><text x="450" y="404">50</text>
+      <text x="575" y="404">75</text><text x="700" y="404">100</text>
+      <text x="450" y="423" fill="#777" font-size="12">Precision@K (% of flagged pages that declined)</text>
+    </g>
+    <!-- base-rate line -->
+    <line x1="439" y1="16" x2="439" y2="392" stroke="#d93025" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <text x="439" y="12" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="10.5" fill="#d93025">47.8%</text>
+    <!-- group labels -->
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="13" font-weight="600" fill="#444" text-anchor="end">
+      <text x="192" y="72">Top 10</text><text x="192" y="166">Top 50</text>
+      <text x="192" y="260">Top 100</text><text x="192" y="354">Top 500</text>
+    </g>
+    <!-- value labels + bars: shared attrs -->
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="12" fill="#222">
+    <!-- TOP 10 -->
+    <rect x="200" y="38" width="250" height="17" rx="2" fill="#9aa0a6"/><text x="456" y="51">50.0</text>
+    <line x1="300" y1="46.5" x2="600" y2="46.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="300" y1="42" x2="300" y2="51" stroke="#222" stroke-opacity=".5"/><line x1="600" y1="42" x2="600" y2="51" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="60" width="500" height="17" rx="2" fill="#0f766e"/><text x="706" y="73">100.0</text>
+    <line x1="700" y1="64" x2="700" y2="73" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="82" width="450" height="17" rx="2" fill="#b45309"/><text x="656" y="95">90.0</text>
+    <line x1="550" y1="90.5" x2="700" y2="90.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="550" y1="86" x2="550" y2="95" stroke="#222" stroke-opacity=".5"/><line x1="700" y1="86" x2="700" y2="95" stroke="#222" stroke-opacity=".5"/>
+    <!-- TOP 50 -->
+    <rect x="200" y="132" width="230" height="17" rx="2" fill="#9aa0a6"/><text x="436" y="145">46.0</text>
+    <line x1="360" y1="140.5" x2="500" y2="140.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="360" y1="136" x2="360" y2="145" stroke="#222" stroke-opacity=".5"/><line x1="500" y1="136" x2="500" y2="145" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="154" width="480" height="17" rx="2" fill="#0f766e"/><text x="686" y="167">96.0</text>
+    <line x1="650" y1="162.5" x2="700" y2="162.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="650" y1="158" x2="650" y2="167" stroke="#222" stroke-opacity=".5"/><line x1="700" y1="158" x2="700" y2="167" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="176" width="450" height="17" rx="2" fill="#b45309"/><text x="656" y="189">90.0</text>
+    <line x1="600" y1="184.5" x2="690" y2="184.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="600" y1="180" x2="600" y2="189" stroke="#222" stroke-opacity=".5"/><line x1="690" y1="180" x2="690" y2="189" stroke="#222" stroke-opacity=".5"/>
+    <!-- TOP 100 -->
+    <rect x="200" y="226" width="215" height="17" rx="2" fill="#9aa0a6"/><text x="421" y="239">43.0</text>
+    <line x1="365" y1="234.5" x2="465" y2="234.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="365" y1="230" x2="365" y2="239" stroke="#222" stroke-opacity=".5"/><line x1="465" y1="230" x2="465" y2="239" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="248" width="465" height="17" rx="2" fill="#0f766e"/><text x="671" y="261">93.0</text>
+    <line x1="635" y1="256.5" x2="690" y2="256.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="635" y1="252" x2="635" y2="261" stroke="#222" stroke-opacity=".5"/><line x1="690" y1="252" x2="690" y2="261" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="270" width="440" height="17" rx="2" fill="#b45309"/><text x="646" y="283">88.0</text>
+    <line x1="605" y1="278.5" x2="670" y2="278.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="605" y1="274" x2="605" y2="283" stroke="#222" stroke-opacity=".5"/><line x1="670" y1="274" x2="670" y2="283" stroke="#222" stroke-opacity=".5"/>
+    <!-- TOP 500 -->
+    <rect x="200" y="320" width="248" height="17" rx="2" fill="#9aa0a6"/><text x="454" y="333">49.6</text>
+    <line x1="426" y1="328.5" x2="470" y2="328.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="426" y1="324" x2="426" y2="333" stroke="#222" stroke-opacity=".5"/><line x1="470" y1="324" x2="470" y2="333" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="342" width="434" height="17" rx="2" fill="#0f766e"/><text x="640" y="355">86.8</text>
+    <line x1="619" y1="350.5" x2="648" y2="350.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="619" y1="346" x2="619" y2="355" stroke="#222" stroke-opacity=".5"/><line x1="648" y1="346" x2="648" y2="355" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="364" width="467" height="17" rx="2" fill="#b45309"/><text x="673" y="377">93.4</text>
+    <line x1="656" y1="372.5" x2="678" y2="372.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="656" y1="368" x2="656" y2="377" stroke="#222" stroke-opacity=".5"/><line x1="678" y1="368" x2="678" y2="377" stroke="#222" stroke-opacity=".5"/>
+    </g>
+  </svg>
+  <figcaption><strong>Chart 1.</strong> Precision@K on the development frame, bars grouped by queue depth (top to bottom in each group: rule baseline, logistic regression, gradient boosting). Dark ticks are 95% bootstrap bands. Logistic regression clears the base rate at every depth and beats the rule baseline beyond its band at the top 100; the hand rule barely reaches chance.</figcaption>
+  </figure>
+
+  <h3>Reading the headline</h3>
+  <p>At the top 100 &mdash; a realistic monthly review queue &mdash; logistic regression flagged pages that declined <strong>93.0%</strong> of the time, against a 47.8% base rate. In plain terms, roughly 93 of its top 100 picks were genuine decliners. The rule baseline landed at <strong>43.0%</strong>, with a band of [33.0, 53.0] that straddles the base rate: at this depth the common-sense rule is <em>no better than picking at random</em>. Logistic regression&rsquo;s advantage over the rule clears its bootstrap band, so it is a real separation, not noise.</p>
+
+  <h3>Did the more complex model earn its keep?</h3>
+  <p>Not at the operating depth. At the top 100, gradient boosting scored 88.0% [81.0, 94.0] versus logistic&rsquo;s 93.0% [87.0, 98.0] &mdash; the bands overlap, so there is no honest case that the heavier model is better where it matters, and the simpler, more transparent logistic model wins by default. The flip side, reported plainly: gradient boosting <em>does</em> pull ahead deeper in the queue (top 500: 93.4% vs 86.8%) and on whole-population ranking quality (ROC-AUC 0.7155 vs 0.6644). If the job were to rank the entire library rather than skim the top 100, gradient boosting would be the pick. For a short triage queue, it is not.</p>
+
+  <div class="tablewrap">
+  <table>
+    <caption>Whole-population ranking quality (secondary diagnostics). A random ranker scores ROC-AUC 0.50 and average precision near the 0.478 base rate.</caption>
+    <thead><tr><th>Scorer</th><th>ROC-AUC</th><th>Average precision</th></tr></thead>
+    <tbody>
+      <tr><td>Rule baseline</td><td>0.5249</td><td>0.4994</td></tr>
+      <tr><td>Logistic regression</td><td>0.6644</td><td>0.6378</td></tr>
+      <tr><td>Gradient boosting</td><td>0.7155</td><td>0.6874</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Where the lift actually comes from &mdash; an ablation</h3>
+  <p>This is the most important result on the page, so it gets its own test. Holding the split and the model fixed and changing <em>only</em> the feature set, how much of the performance is the raw traffic-level features (size, position, CTR), and how much is the four within-window dynamics features?</p>
+
+  <div class="legend" aria-hidden="true">
+    <span><span class="sw" style="background:var(--rule)"></span>Level only (5 features)</span>
+    <span><span class="sw" style="background:var(--accent)"></span>Level + dynamics (9 features)</span>
+    <span><span style="display:inline-block;width:16px;border-top:2px dashed var(--baserate);vertical-align:middle"></span>&nbsp;Base rate 47.8%</span>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 760 326" role="img" aria-labelledby="c2t c2d" preserveAspectRatio="xMinYMin meet">
+    <title id="c2t">Feature ablation, precision at K</title>
+    <desc id="c2d">Horizontal bars comparing a level-only feature set against level plus dynamics at the top 10, 50, 100 and 500 pages. Adding the four dynamics features lifts top-100 precision from 60 to 93 percent.</desc>
+    <g stroke="#eeeeee" stroke-width="1">
+      <line x1="325" y1="22" x2="325" y2="276"/><line x1="450" y1="22" x2="450" y2="276"/>
+      <line x1="575" y1="22" x2="575" y2="276"/><line x1="700" y1="22" x2="700" y2="276"/>
+    </g>
+    <line x1="200" y1="22" x2="200" y2="276" stroke="#cccccc" stroke-width="1"/>
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="11" fill="#999" text-anchor="middle">
+      <text x="200" y="292">0</text><text x="325" y="292">25</text><text x="450" y="292">50</text>
+      <text x="575" y="292">75</text><text x="700" y="292">100</text>
+      <text x="450" y="311" fill="#777" font-size="12">Precision@K (% of flagged pages that declined)</text>
+    </g>
+    <line x1="439" y1="20" x2="439" y2="280" stroke="#d93025" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <text x="439" y="16" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="10.5" fill="#d93025">47.8%</text>
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="13" font-weight="600" fill="#444" text-anchor="end">
+      <text x="192" y="54">Top 10</text><text x="192" y="120">Top 50</text>
+      <text x="192" y="186">Top 100</text><text x="192" y="252">Top 500</text>
+    </g>
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="12" fill="#222">
+    <rect x="200" y="34" width="300" height="18" rx="2" fill="#9aa0a6"/><text x="506" y="47">60.0</text>
+    <rect x="200" y="56" width="500" height="18" rx="2" fill="#0f766e"/><text x="706" y="69">100.0</text>
+    <rect x="200" y="100" width="320" height="18" rx="2" fill="#9aa0a6"/><text x="526" y="113">64.0</text>
+    <rect x="200" y="122" width="480" height="18" rx="2" fill="#0f766e"/><text x="686" y="135">96.0</text>
+    <rect x="200" y="166" width="300" height="18" rx="2" fill="#9aa0a6"/><text x="506" y="179">60.0</text>
+    <rect x="200" y="188" width="465" height="18" rx="2" fill="#0f766e"/><text x="671" y="201">93.0</text>
+    <rect x="200" y="232" width="283" height="18" rx="2" fill="#9aa0a6"/><text x="489" y="245">56.6</text>
+    <rect x="200" y="254" width="434" height="18" rx="2" fill="#0f766e"/><text x="640" y="267">86.8</text>
+    </g>
+  </svg>
+  <figcaption><strong>Chart 2.</strong> Feature ablation on the development frame (point estimates, identical grouped split). At the top 100, adding the four within-window dynamics features lifts precision from 60.0% to 93.0% &mdash; a <strong>+33.0 pp</strong> jump. Level features alone already beat the base rate, but the dynamics features carry most of the usable signal.</figcaption>
+  </figure>
+
+  <div class="tablewrap">
+  <table>
+    <caption>Ablation detail, Frame A. Precision@K as point estimates; ranking metrics on the whole population.</caption>
+    <thead><tr><th>Feature set</th><th>Top 10</th><th>Top 50</th><th>Top 100</th><th>Top 500</th><th>ROC-AUC</th><th>AP</th></tr></thead>
+    <tbody>
+      <tr><td>Level only (5)</td><td>60.0</td><td>64.0</td><td>60.0</td><td>56.6</td><td>0.5900</td><td>0.5382</td></tr>
+      <tr><td>Level + dynamics (9)</td><td>100.0</td><td>96.0</td><td class="num-hi">93.0</td><td>86.8</td><td>0.6644</td><td>0.6378</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Which features carry the signal</h3>
+  <p>Permutation importance, run on one held-out client fold (scored by average precision, five repeats), tells the same story from the other direction. It is descriptive &mdash; it says which features the model leans on, nothing causal.</p>
+  <div class="tablewrap">
+  <table>
+    <caption>Permutation importance (drop in average precision when a feature is shuffled). Descriptive only.</caption>
+    <thead><tr><th>Feature</th><th>Importance</th></tr></thead>
+    <tbody>
+      <tr><td>w_late_share <small>(dynamics)</small></td><td class="num-hi">0.11601</td></tr>
+      <tr><td>w_impr_cv <small>(dynamics)</small></td><td>0.04854</td></tr>
+      <tr><td>w_max_day_share <small>(dynamics)</small></td><td>0.03426</td></tr>
+      <tr><td>w_clicks <small>(level)</small></td><td>0.00601</td></tr>
+      <tr><td>w_impressions <small>(level)</small></td><td>0.00005</td></tr>
+      <tr><td>w_ctr_pct <small>(level)</small></td><td>0.00000</td></tr>
+      <tr><td>w_impression_days <small>(level)</small></td><td>-0.00029</td></tr>
+      <tr><td>w_active_day_share <small>(dynamics)</small></td><td>-0.00029</td></tr>
+      <tr><td>w_avg_position <small>(level)</small></td><td>-0.00863</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Almost all the usable signal sits in three dynamics features &mdash; <span class="mono">w_late_share</span>, <span class="mono">w_impr_cv</span>, and <span class="mono">w_max_day_share</span>. Once those are present, the level features add essentially nothing. That is a clue about what the model is really keying on, and it is picked up directly in the limitations.</p>
+
+  <h3>Does it hold up on a month the model never saw?</h3>
+  <p>Cross-validation guards against fooling yourself within one period. The harder question is time: fit everything on Frame A, freeze it, and apply it untouched to Frame B (April&rarr;May 2026), whose base rate is 47.21%. The rule&rsquo;s CTR cutoff (0.1908%) is carried over from Frame A as well.</p>
+
+  <div class="legend" aria-hidden="true">
+    <span><span class="sw" style="background:var(--rule)"></span>Rule baseline</span>
+    <span><span class="sw" style="background:var(--accent)"></span>Logistic regression</span>
+    <span><span class="sw" style="background:var(--amber)"></span>Gradient boosting</span>
+    <span><span style="display:inline-block;width:16px;border-top:2px dashed var(--baserate);vertical-align:middle"></span>&nbsp;Base rate 47.2%</span>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 760 430" role="img" aria-labelledby="c3t c3d" preserveAspectRatio="xMinYMin meet">
+    <title id="c3t">Forward-time test, precision at K</title>
+    <desc id="c3d">Grouped horizontal bars for the forward-time test on Frame B. Logistic regression and gradient boosting stay far above the 47.2 percent base rate at every depth; the rule baseline falls below it.</desc>
+    <g stroke="#eeeeee" stroke-width="1">
+      <line x1="325" y1="18" x2="325" y2="388"/><line x1="450" y1="18" x2="450" y2="388"/>
+      <line x1="575" y1="18" x2="575" y2="388"/><line x1="700" y1="18" x2="700" y2="388"/>
+    </g>
+    <line x1="200" y1="18" x2="200" y2="388" stroke="#cccccc" stroke-width="1"/>
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="11" fill="#999" text-anchor="middle">
+      <text x="200" y="404">0</text><text x="325" y="404">25</text><text x="450" y="404">50</text>
+      <text x="575" y="404">75</text><text x="700" y="404">100</text>
+      <text x="450" y="423" fill="#777" font-size="12">Precision@K (% of flagged pages that declined)</text>
+    </g>
+    <line x1="436" y1="16" x2="436" y2="392" stroke="#d93025" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <text x="436" y="12" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="10.5" fill="#d93025">47.2%</text>
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="13" font-weight="600" fill="#444" text-anchor="end">
+      <text x="192" y="72">Top 10</text><text x="192" y="166">Top 50</text>
+      <text x="192" y="260">Top 100</text><text x="192" y="354">Top 500</text>
+    </g>
+    <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="12" fill="#222">
+    <!-- TOP 10 -->
+    <rect x="200" y="38" width="200" height="17" rx="2" fill="#9aa0a6"/><text x="406" y="51">40.0</text>
+    <line x1="250" y1="46.5" x2="550" y2="46.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="250" y1="42" x2="250" y2="51" stroke="#222" stroke-opacity=".5"/><line x1="550" y1="42" x2="550" y2="51" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="60" width="450" height="17" rx="2" fill="#0f766e"/><text x="656" y="73">90.0</text>
+    <line x1="550" y1="68.5" x2="700" y2="68.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="550" y1="64" x2="550" y2="73" stroke="#222" stroke-opacity=".5"/><line x1="700" y1="64" x2="700" y2="73" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="82" width="500" height="17" rx="2" fill="#b45309"/><text x="706" y="95">100.0</text>
+    <line x1="700" y1="86" x2="700" y2="95" stroke="#222" stroke-opacity=".5"/>
+    <!-- TOP 50 -->
+    <rect x="200" y="132" width="130" height="17" rx="2" fill="#9aa0a6"/><text x="336" y="145">26.0</text>
+    <line x1="270" y1="140.5" x2="390" y2="140.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="270" y1="136" x2="270" y2="145" stroke="#222" stroke-opacity=".5"/><line x1="390" y1="136" x2="390" y2="145" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="154" width="480" height="17" rx="2" fill="#0f766e"/><text x="686" y="167">96.0</text>
+    <line x1="650" y1="162.5" x2="700" y2="162.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="650" y1="158" x2="650" y2="167" stroke="#222" stroke-opacity=".5"/><line x1="700" y1="158" x2="700" y2="167" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="176" width="490" height="17" rx="2" fill="#b45309"/><text x="696" y="189">98.0</text>
+    <line x1="670" y1="184.5" x2="700" y2="184.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="670" y1="180" x2="670" y2="189" stroke="#222" stroke-opacity=".5"/><line x1="700" y1="180" x2="700" y2="189" stroke="#222" stroke-opacity=".5"/>
+    <!-- TOP 100 -->
+    <rect x="200" y="226" width="160" height="17" rx="2" fill="#9aa0a6"/><text x="366" y="239">32.0</text>
+    <line x1="315" y1="234.5" x2="405" y2="234.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="315" y1="230" x2="315" y2="239" stroke="#222" stroke-opacity=".5"/><line x1="405" y1="230" x2="405" y2="239" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="248" width="490" height="17" rx="2" fill="#0f766e"/><text x="696" y="261">98.0</text>
+    <line x1="675" y1="256.5" x2="700" y2="256.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="675" y1="252" x2="675" y2="261" stroke="#222" stroke-opacity=".5"/><line x1="700" y1="252" x2="700" y2="261" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="270" width="495" height="17" rx="2" fill="#b45309"/><text x="701" y="283">99.0</text>
+    <line x1="685" y1="278.5" x2="700" y2="278.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="685" y1="274" x2="685" y2="283" stroke="#222" stroke-opacity=".5"/><line x1="700" y1="274" x2="700" y2="283" stroke="#222" stroke-opacity=".5"/>
+    <!-- TOP 500 -->
+    <rect x="200" y="320" width="194" height="17" rx="2" fill="#9aa0a6"/><text x="400" y="333">38.8</text>
+    <line x1="373" y1="328.5" x2="416" y2="328.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="373" y1="324" x2="373" y2="333" stroke="#222" stroke-opacity=".5"/><line x1="416" y1="324" x2="416" y2="333" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="342" width="482" height="17" rx="2" fill="#0f766e"/><text x="688" y="355">96.4</text>
+    <line x1="674" y1="350.5" x2="690" y2="350.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="674" y1="346" x2="674" y2="355" stroke="#222" stroke-opacity=".5"/><line x1="690" y1="346" x2="690" y2="355" stroke="#222" stroke-opacity=".5"/>
+    <rect x="200" y="364" width="490" height="17" rx="2" fill="#b45309"/><text x="696" y="377">98.0</text>
+    <line x1="684" y1="372.5" x2="696" y2="372.5" stroke="#222" stroke-opacity=".5" stroke-width="1.4"/><line x1="684" y1="368" x2="684" y2="377" stroke="#222" stroke-opacity=".5"/><line x1="696" y1="368" x2="696" y2="377" stroke="#222" stroke-opacity=".5"/>
+    </g>
+  </svg>
+  <figcaption><strong>Chart 3.</strong> Forward-time test on Frame B (April&rarr;May 2026), read against its own 47.2% base rate. Both models stay well above chance on the unseen month; the rule baseline falls below it. Dark ticks are 95% bootstrap bands.</figcaption>
+  </figure>
+
+  <div class="tablewrap">
+  <table>
+    <caption>Forward-time test, Frame B. Precision@K (%) with bootstrap band; whole-population metrics at right. Base rate = 47.21%.</caption>
+    <thead><tr><th>Scorer</th><th>Top 10</th><th>Top 50</th><th>Top 100</th><th>Top 500</th><th>ROC-AUC</th><th>AP</th></tr></thead>
+    <tbody>
+      <tr><td>Rule baseline</td><td>40.0 <small>[10, 70]</small></td><td>26.0 <small>[14, 38]</small></td><td>32.0 <small>[23, 41]</small></td><td>38.8 <small>[34.6, 43.2]</small></td><td>0.5582</td><td>0.5090</td></tr>
+      <tr><td>Logistic regression</td><td>90.0 <small>[70, 100]</small></td><td>96.0 <small>[90, 100]</small></td><td class="num-hi">98.0 <small>[95, 100]</small></td><td>96.4 <small>[94.8, 98.0]</small></td><td>0.7579</td><td>0.7342</td></tr>
+      <tr><td>Gradient boosting</td><td>100.0 <small>[100, 100]</small></td><td>98.0 <small>[94, 100]</small></td><td>99.0 <small>[97, 100]</small></td><td>98.0 <small>[96.8, 99.2]</small></td><td>0.7746</td><td>0.7633</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <h3>What this test does and does not show</h3>
+    <p style="margin-bottom:0">This is a <strong>time-forward</strong> test, not a client-holdout test. The same 46 clients appear in both months, so it measures whether the model <em>stays stable over time</em> &mdash; it does not measure generalization to brand-new clients. That second question is exactly what the client-grouped cross-validation on Frame A answers. And because Frame B has its own base rate (47.21%), its Precision@K is only meaningful against 47.21%, never against Frame A&rsquo;s 47.82%. The takeaway is narrow and honest: on an unseen later month, the model did not degrade.</p>
+  </div>
+</section>
+
+<section id="limits">
+  <h2><span class="num">6</span>Limitations &amp; honest framing</h2>
+
+  <div class="callout">
+    <h3>The one that matters most: this is triage, not a forecast</h3>
+    <p>The ablation showed that adding four within-window dynamics features lifted top-100 precision from 60.0% to 93.0%, and permutation importance put nearly all the weight on <span class="mono">w_late_share</span>, <span class="mono">w_impr_cv</span>, and <span class="mono">w_max_day_share</span>. That lift is real, but it is <strong>partly mechanical with the label</strong>. The label asks whether next month&rsquo;s impressions fall below 80% of this month&rsquo;s; those three features measure whether a page&rsquo;s impressions were <em>already</em> trailing off, spiking, or unstable <em>inside</em> the decision window. A page visibly sliding by the end of the month tends, by simple momentum, to keep sliding.</p>
+    <p style="margin-bottom:0">This is <strong>not leakage</strong> &mdash; every feature uses decision-window data only, no outcome-window value ever touches the model (the ten-check audit confirms it). But it does mean the honest description is: the model <em>detects pages that are already in decline and are likely to continue</em>, not one that foresees a drop before any sign of it appears. It earns its place as a triage tool that puts in-progress slides at the top of a review queue &mdash; nothing on this page claims more than that.</p>
+  </div>
+
+  <h3>A data-quality caveat on average position</h3>
+  <p>The <span class="mono">w_avg_position</span> column contains values below 1.0 (minimum 0.0196; individual examples include 0.116, 0.069, 0.541). A Google average position can never be better than 1.0, so these are an artifact of the pseudonymization applied to the research release, not real rankings. The feature is therefore usable only as a <em>relative</em> signal, not a literal position, and it happens to carry almost no weight in the model anyway (permutation importance &minus;0.00863). Coverage is otherwise near-complete: 157,790 of 158,549 rows are non-null, and the 759 missing values were median-imputed.</p>
+
+  <h3>What the bootstrap bands do and don&rsquo;t mean</h3>
+  <p>Each band describes how the decline rate varies <em>within a fixed top-K selection, holding the ranking constant</em> &mdash; it is a stability check on the reported precision, not a confidence interval over resampling the whole population. Overlapping bands (as between the two models at the top 100) mean &ldquo;no honest separation here,&rdquo; and that is how they are read throughout.</p>
+
+  <h3>Other boundaries, stated plainly</h3>
+  <ul>
+    <li><strong>Survivorship.</strong> A page must appear in both the decision and outcome windows to have a defined outcome. Pages that vanished entirely between months are not counted, so &ldquo;decline&rdquo; here means &ldquo;still present but down,&rdquo; never &ldquo;disappeared.&rdquo;</li>
+    <li><strong>The label is a proxy with an arbitrary cut.</strong> The 80% threshold is a modeling choice; a page at 79% is labeled a decline and one at 81% is not, though little separates them.</li>
+    <li><strong>No causal claim.</strong> The data is observational &mdash; one summary per page-month, no intervention. Nothing here says that refreshing a page, or any other action, <em>prevents</em> decline. The output supports where to look, not what will happen if you act.</li>
+    <li><strong>One portfolio, three months.</strong> Findings come from 46&ndash;51 clients of a single agency across three consecutive months of one warehouse release. They do not describe the web at large, and they are not a statement about how Google&rsquo;s algorithm works or a prediction of it.</li>
+  </ul>
+</section>
+
+<section id="reco">
+  <h2><span class="num">7</span>Ranked recommendations</h2>
+  <p>The deliverable is a <strong>ranked, reason-coded review queue</strong>. Every eligible page is scored by the logistic model&rsquo;s probability (<span class="mono">score_logreg</span>) and sorted high to low; pages with fewer than <span class="mono">MIN_ACTIONABLE_IMPRESSIONS = 100</span> decision-window impressions are set aside as not worth a human&rsquo;s time. Each surviving row carries a rank, a reason code, a suggested review action, and a confidence band. An editor works the list from the top down until the month&rsquo;s review budget runs out.</p>
+
+  <h3>What a FlyRank editor should do, in priority order</h3>
+  <ol>
+    <li><strong>Work the top of the queue, not the whole library.</strong> The evidence is strongest at shallow depth &mdash; ~93% precision at the top 100 on the development frame, holding on the unseen month. Precision decays as you go deeper, so the top 100 is where a fixed review budget buys the most.</li>
+    <li><strong>Read it as &ldquo;review first,&rdquo; not &ldquo;these will decline.&rdquo;</strong> A high rank means the page is showing the within-window instability associated with continued decline &mdash; a reason to open it, not a verdict on its future.</li>
+    <li><strong>Let the reason code choose the job.</strong> A single-day-spike page needs a stability check; a visible-but-low-CTR page needs a title/snippet look. Same queue, different work &mdash; the reason code says which.</li>
+    <li><strong>Respect the confidence band and the Hold override.</strong> Lower-confidence rows and pages the no-go rule flagged for Hold should get a human&rsquo;s judgment before entering any automated workflow.</li>
+  </ol>
+
+  <h3>What sits in the top 100</h3>
+  <div class="tablewrap">
+  <table>
+    <caption>Composition of the top-100 queue by reason code (development frame). &ldquo;Declined&rdquo; is the share of that group that actually declined. Median impressions is the decision-window median for that group.</caption>
+    <thead><tr><th>Reason code</th><th>Pages</th><th>Declined</th><th>Median impressions</th><th>Review action</th></tr></thead>
+    <tbody>
+      <tr><td>single_day_spike</td><td>49</td><td>95.92%</td><td>752.0</td><td>Stability review</td></tr>
+      <tr><td>visible_but_low_ctr</td><td>34</td><td>88.24%</td><td>3,725.5</td><td>Title/snippet review</td></tr>
+      <tr><td>front_loaded_window</td><td>8</td><td>100.00%</td><td>1,170.5</td><td>Freshness review</td></tr>
+      <tr><td>thin_daily_coverage</td><td>6</td><td>100.00%</td><td>206.5</td><td>Coverage/indexing review</td></tr>
+      <tr><td>model_flag_no_single_pattern</td><td>3</td><td>66.67%</td><td>143,907.0</td><td>General review</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Those reason codes map to a concrete action mix across the top 100: <strong>Stability review 49, Title/snippet review 34, Freshness review 8, Coverage/indexing review 5, General review 3, Hold 1</strong>. The one Hold is the no-go rule working as designed &mdash; it pulled a single <span class="mono">thin_daily_coverage</span> page (6 pages in that group) out of the Coverage/indexing action and into Hold, which is why that action shows 5 rather than 6. Confidence bands are assigned from the model&rsquo;s probability: <strong>Higher</strong> at &ge;0.60, <strong>Medium</strong> at &ge;0.45, <strong>Lower</strong> below that.</p>
+</section>
+
+<section id="repro">
+  <h2><span class="num">8</span>Reproducibility</h2>
+  <p>The analysis is deterministic and re-runnable from a fresh clone. Randomness is pinned in two places: <span class="mono">random_state=42</span> for the <span class="mono">StratifiedGroupKFold</span> split and <span class="mono">np.random.default_rng(42)</span> for the bootstrap. Both frames are sorted on their join keys before any split, which removes the DuckDB row-order non-determinism that made two earlier weeks&rsquo; AUC numbers disagree.</p>
+
+  <h3>Re-running it</h3>
+  <ol>
+    <li>Open <span class="mono">work/notebooks/capstone.ipynb</span> from the <a href="https://github.com/MuhammadAyyanHassan/flyrank-ml-internship-work">repository</a> in Colab.</li>
+    <li>Put your Hugging Face token in <strong>Colab Secrets</strong> as <span class="mono">HF_TOKEN</span> &mdash; never in the notebook source, never committed. The notebook queries the gated release in place with DuckDB over <span class="mono">hf://</span>; the dataset is never downloaded into the repo.</li>
+    <li>Run top to bottom. The run writes its receipt to <span class="mono">work/outputs/capstone_metrics.json</span>, committed alongside the executed notebook so the reported numbers are checkable from the repo rather than taken on faith.</li>
+  </ol>
+
+  <h3>Consistency checks that must pass</h3>
+  <div class="tablewrap">
+  <table>
+    <caption>Cross-checks against the upstream ML-04 / ML-07 / ML-09 notebooks on the development frame.</caption>
+    <thead><tr><th>Check</th><th>Expected</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Row count, Frame A</td><td>158,549</td><td>PASS</td></tr>
+      <tr><td>Decline rate, Frame A</td><td>0.4782</td><td>PASS</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Code and executed notebook: <a href="https://github.com/MuhammadAyyanHassan/flyrank-ml-internship-work/blob/main/work/notebooks/capstone.ipynb"><span class="mono">work/notebooks/capstone.ipynb</span></a> in the <a href="https://github.com/MuhammadAyyanHassan/flyrank-ml-internship-work">project repository</a>.</p>
+</section>
+
+<footer>
+  <h2 style="color:var(--ink)"><span class="num">9</span>Acknowledgments &amp; data credit</h2>
+  <p>Built on the FlyRank ML Internship dataset (<a href="https://flyrank.ai">flyrank.ai</a>). Crediting the data source is standard research practice; the pseudonymized warehouse release made this work possible while keeping every client anonymous.</p>
+  <p style="margin-top:14px">Muhammad Ayyan Hassan &middot; FlyRank ML Internship (Machine Learning track) &middot; August 2026</p>
+</footer>
+
+</div>
+</body>
+</html>
